@@ -54,14 +54,28 @@ interface Result {
   criteria1: number;
   criteria2: number;
   criteria3: number;
+  criteria4: number;
   judge_name?: string;
   judge_code?: string;
+}
+
+interface MyJudgment {
+  id: number;
+  participant_name: string;
+  participant_code: string;
+  category_name: string;
+  criteria1: number;
+  criteria2: number;
+  criteria3: number;
+  criteria4: number;
+  total: number;
+  thumbnail_url: string;
 }
 
 const JUDGE_ID = `judge_${Math.random().toString(36).substring(2, 9)}`;
 
 export default function App() {
-  const [view, setView] = useState<'categories' | 'submissions' | 'judging' | 'results' | 'admin'>('categories');
+  const [view, setView] = useState<'categories' | 'submissions' | 'judging' | 'results' | 'admin' | 'my-judgments'>('categories');
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -69,9 +83,10 @@ export default function App() {
   const [judges, setJudges] = useState<Judge[]>([]);
   const [currentSubmission, setCurrentSubmission] = useState<Submission | null>(null);
   const [results, setResults] = useState<Result[]>([]);
+  const [myJudgments, setMyJudgments] = useState<MyJudgment[]>([]);
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
-  const [scores, setScores] = useState({ criteria1: '', criteria2: '', criteria3: '' });
+  const [scores, setScores] = useState({ criteria1: '', criteria2: '', criteria3: '', criteria4: '' });
   const [socket, setSocket] = useState<Socket | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -139,6 +154,15 @@ export default function App() {
     setView('results');
   };
 
+  const fetchMyJudgments = async () => {
+    setLoading(true);
+    const res = await fetch(`/api/my-judgments/${JUDGE_ID}`);
+    const data = await res.json();
+    setMyJudgments(data);
+    setView('my-judgments');
+    setLoading(false);
+  };
+
   const handleExportExcel = () => {
     const exportData = filteredAndSortedResults.map((res, idx) => ({
       'Classificação': idx + 1,
@@ -149,6 +173,7 @@ export default function App() {
       'Nota C1': res.criteria1,
       'Nota C2': res.criteria2,
       'Nota C3': res.criteria3,
+      'Nota C4': res.criteria4,
       'Média Final': res.total
     }));
 
@@ -191,7 +216,7 @@ export default function App() {
       const fullSub = await fullSubRes.json();
       setCurrentSubmission(fullSub);
       setView('judging');
-      setScores({ criteria1: '', criteria2: '', criteria3: '' });
+      setScores({ criteria1: '', criteria2: '', criteria3: '', criteria4: '' });
     } else {
       alert('Esta inscrição já está sendo julgada por outro jurado.');
       fetchSubmissions(selectedCategory!.id);
@@ -201,8 +226,13 @@ export default function App() {
   const handleCancelJudging = async () => {
     if (currentSubmission) {
       await fetch(`/api/submissions/${currentSubmission.id}/unlock`, { method: 'POST' });
+      const prevSubId = currentSubmission.id;
       setCurrentSubmission(null);
-      setView('submissions');
+      if (selectedCategory) {
+        setView('submissions');
+      } else {
+        fetchMyJudgments();
+      }
     }
   };
 
@@ -213,14 +243,33 @@ export default function App() {
     const res = await fetch(`/api/submissions/${currentSubmission.id}/score`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(scores)
+      body: JSON.stringify({ ...scores, judgeId: JUDGE_ID })
     });
 
     if (res.ok) {
       setCurrentSubmission(null);
-      setView('submissions');
-      fetchSubmissions(selectedCategory!.id);
+      if (selectedCategory) {
+        setView('submissions');
+        fetchSubmissions(selectedCategory.id);
+      } else {
+        fetchMyJudgments();
+      }
     }
+  };
+
+  const handleReviewJudgment = async (judgment: MyJudgment) => {
+    setLoading(true);
+    const res = await fetch(`/api/submissions/${judgment.id}`);
+    const fullSub = await res.json();
+    setCurrentSubmission(fullSub);
+    setScores({
+      criteria1: judgment.criteria1.toString(),
+      criteria2: judgment.criteria2.toString(),
+      criteria3: judgment.criteria3.toString(),
+      criteria4: judgment.criteria4.toString()
+    });
+    setView('judging');
+    setLoading(false);
   };
 
   const filteredAndSortedResults = results
@@ -278,6 +327,15 @@ export default function App() {
               )}
             >
               Atribuição
+            </button>
+            <button 
+              onClick={fetchMyJudgments}
+              className={cn(
+                "text-sm font-medium transition-colors",
+                view === 'my-judgments' ? "text-brand-blue" : "text-[#141414]/50 hover:text-brand-blue"
+              )}
+            >
+              Meus Julgamentos
             </button>
             <div className="h-4 w-[1px] bg-[#141414]/10" />
             <div className="flex items-center gap-2 text-xs font-mono bg-brand-blue/5 text-brand-blue px-3 py-1.5 rounded-full border border-brand-blue/10">
@@ -480,9 +538,10 @@ export default function App() {
                   <form onSubmit={handleSubmitScores} className="space-y-10">
                     <div className="space-y-8">
                       {[
-                        { id: 'criteria1', label: 'Composição e Técnica', desc: 'Uso de luz, enquadramento e foco.' },
-                        { id: 'criteria2', label: 'Criatividade e Originalidade', desc: 'Perspectiva única e inovação.' },
-                        { id: 'criteria3', label: 'Impacto e Narrativa', desc: 'Capacidade de contar uma história.' }
+                        { id: 'criteria1', label: 'Composição', desc: 'Uso de luz, enquadramento e foco.' },
+                        { id: 'criteria2', label: 'Criatividade', desc: 'Perspectiva única e inovação.' },
+                        { id: 'criteria3', label: 'Técnica', desc: 'Qualidade técnica e execução.' },
+                        { id: 'criteria4', label: 'Impacto', desc: 'Capacidade de contar uma história.' }
                       ].map((c) => (
                         <div key={c.id}>
                           <label className="block text-sm font-bold mb-1.5 text-brand-blue">{c.label}</label>
@@ -514,8 +573,8 @@ export default function App() {
                           <span>AUTO-CALCULADO</span>
                         </div>
                         <div className="text-4xl font-mono font-bold text-brand-blue">
-                          {((parseFloat(scores.criteria1) || 0) + (parseFloat(scores.criteria2) || 0) + (parseFloat(scores.criteria3) || 0) > 0) 
-                            ? (((parseFloat(scores.criteria1) || 0) + (parseFloat(scores.criteria2) || 0) + (parseFloat(scores.criteria3) || 0)) / 3).toFixed(2)
+                          {((parseFloat(scores.criteria1) || 0) + (parseFloat(scores.criteria2) || 0) + (parseFloat(scores.criteria3) || 0) + (parseFloat(scores.criteria4) || 0) > 0) 
+                            ? (((parseFloat(scores.criteria1) || 0) + (parseFloat(scores.criteria2) || 0) + (parseFloat(scores.criteria3) || 0) + (parseFloat(scores.criteria4) || 0)) / 4).toFixed(2)
                             : "0.00"
                           }
                         </div>
@@ -602,6 +661,7 @@ export default function App() {
                       <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-brand-blue/50">C1</th>
                       <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-brand-blue/50">C2</th>
                       <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-brand-blue/50">C3</th>
+                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-brand-blue/50">C4</th>
                       <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-brand-blue/50">Média Final</th>
                     </tr>
                   </thead>
@@ -638,6 +698,7 @@ export default function App() {
                         <td className="p-6 font-mono text-sm text-brand-blue font-bold">{res.criteria1.toFixed(2)}</td>
                         <td className="p-6 font-mono text-sm text-brand-blue font-bold">{res.criteria2.toFixed(2)}</td>
                         <td className="p-6 font-mono text-sm text-brand-blue font-bold">{res.criteria3.toFixed(2)}</td>
+                        <td className="p-6 font-mono text-sm text-brand-blue font-bold">{res.criteria4.toFixed(2)}</td>
                         <td className="p-6">
                           <div className="font-mono font-bold text-xl text-brand-blue">{res.total.toFixed(2)}</div>
                         </td>
@@ -658,6 +719,111 @@ export default function App() {
                   </tbody>
                 </table>
               </div>
+            </motion.div>
+          )}
+
+          {/* My Judgments View */}
+          {view === 'my-judgments' && (
+            <motion.div
+              key="my-judgments"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-8"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-4xl font-serif italic">Imagens Julgadas</h2>
+                  <p className="text-[#141414]/50 mt-2">Veja e revise as avaliações que você já concluiu.</p>
+                </div>
+                <div className="w-16 h-16 bg-brand-green/10 rounded-full flex items-center justify-center">
+                  <CheckCircle2 className="w-8 h-8 text-brand-green" />
+                </div>
+              </div>
+
+              {loading ? (
+                <div className="p-20 flex flex-col items-center justify-center text-brand-blue/30">
+                  <div className="w-10 h-10 border-4 border-brand-blue/20 border-t-brand-blue rounded-full animate-spin mb-4" />
+                  <p className="font-bold uppercase tracking-widest text-[10px]">Carregando seus julgamentos...</p>
+                </div>
+              ) : myJudgments.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {myJudgments.map((judgment) => (
+                    <motion.div
+                      key={judgment.id}
+                      whileHover={{ y: -5 }}
+                      className="bg-white rounded-[2rem] overflow-hidden border border-brand-blue/10 shadow-sm hover:shadow-xl transition-all group"
+                    >
+                      <div className="aspect-[4/3] relative overflow-hidden bg-slate-100">
+                        <img 
+                          src={judgment.thumbnail_url} 
+                          alt={judgment.participant_name}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                          referrerPolicy="no-referrer"
+                        />
+                        <div className="absolute top-4 right-4">
+                          <span className="bg-white/90 backdrop-blur-md text-[#141414] px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-white/20">
+                            {judgment.category_name}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="p-8 space-y-6">
+                        <div>
+                          <h3 className="text-xl font-bold text-brand-blue mb-1 line-clamp-1">
+                            {judgment.participant_name}
+                          </h3>
+                          <div className="flex items-center gap-2 text-[10px] font-mono font-bold text-brand-blue/30">
+                            <span>{judgment.participant_code}</span>
+                            <span>•</span>
+                            <span>ID #{judgment.id}</span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-y-4 gap-x-6">
+                          {[
+                            { label: 'Composição', value: judgment.criteria1 },
+                            { label: 'Criatividade', value: judgment.criteria2 },
+                            { label: 'Técnica', value: judgment.criteria3 },
+                            { label: 'Impacto', value: judgment.criteria4 }
+                          ].map((score, i) => (
+                            <div key={i} className="flex flex-col">
+                              <span className="text-[10px] font-bold text-brand-blue/30 uppercase tracking-widest mb-1">{score.label}</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-sm font-bold text-brand-blue">{score.value.toFixed(1)}</span>
+                                <Star className="w-3 h-3 text-brand-orange fill-brand-orange" />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="pt-6 border-t border-brand-blue/5 flex items-center justify-between">
+                          <div>
+                            <span className="text-[10px] font-bold text-brand-blue/30 uppercase tracking-widest block mb-1">Média</span>
+                            <div className="text-2xl font-mono font-bold text-brand-blue">{judgment.total.toFixed(2)}</div>
+                          </div>
+                          <button
+                            onClick={() => handleReviewJudgment(judgment)}
+                            className="bg-brand-blue/5 hover:bg-brand-blue text-brand-blue hover:text-white px-6 py-2.5 rounded-xl text-xs font-bold transition-all border border-brand-blue/10"
+                          >
+                            Revisar
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-white rounded-[2.5rem] border border-brand-blue/10 p-20 text-center shadow-sm">
+                  <div className="w-20 h-20 bg-brand-blue/5 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <ImageIcon className="w-10 h-10 text-brand-blue/20" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-brand-blue">Nenhum julgamento ainda</h3>
+                  <p className="text-brand-blue/50 mt-2 max-w-md mx-auto">
+                    Você ainda não concluiu nenhum julgamento. Suas avaliações finalizadas aparecerão aqui para revisão.
+                  </p>
+                </div>
+              )}
             </motion.div>
           )}
 

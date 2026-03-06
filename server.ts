@@ -5,7 +5,7 @@ import { Server } from "socket.io";
 import http from "http";
 import path from "path";
 
-const db = new Database("contest_v4.db");
+const db = new Database("contest_v5.db");
 
 // Initialize Database
 db.exec(`
@@ -51,6 +51,7 @@ db.exec(`
     criteria1 REAL NOT NULL,
     criteria2 REAL NOT NULL,
     criteria3 REAL NOT NULL,
+    criteria4 REAL NOT NULL,
     total REAL NOT NULL,
     FOREIGN KEY (submission_id) REFERENCES submissions(id)
   );
@@ -69,7 +70,7 @@ if (categoryCount.count === 0) {
   const insertParticipant = db.prepare("INSERT INTO participants (name, code) VALUES (?, ?)");
   const insertSubmission = db.prepare("INSERT INTO submissions (participant_id, category_id, status, assigned_judge_id, judge_id) VALUES (?, ?, ?, ?, ?)");
   const insertImage = db.prepare("INSERT INTO images (submission_id, url) VALUES (?, ?)");
-  const insertScore = db.prepare("INSERT INTO scores (submission_id, criteria1, criteria2, criteria3, total) VALUES (?, ?, ?, ?, ?)");
+  const insertScore = db.prepare("INSERT INTO scores (submission_id, criteria1, criteria2, criteria3, criteria4, total) VALUES (?, ?, ?, ?, ?, ?)");
 
   // Create 20 participants
   const firstNames = ['João', 'Maria', 'Pedro', 'Ana', 'Lucas', 'Julia', 'Gabriel', 'Beatriz', 'Mateus', 'Lara'];
@@ -117,8 +118,9 @@ if (categoryCount.count === 0) {
         const c1 = (Math.random() * 4 + 6).toFixed(2); // Higher scores for mock data
         const c2 = (Math.random() * 4 + 6).toFixed(2);
         const c3 = (Math.random() * 4 + 6).toFixed(2);
-        const total = ((parseFloat(c1) + parseFloat(c2) + parseFloat(c3)) / 3).toFixed(2);
-        insertScore.run(sId, c1, c2, c3, total);
+        const c4 = (Math.random() * 4 + 6).toFixed(2);
+        const total = ((parseFloat(c1) + parseFloat(c2) + parseFloat(c3) + parseFloat(c4)) / 4).toFixed(2);
+        insertScore.run(sId, c1, c2, c3, c4, total);
       }
     });
   }
@@ -219,20 +221,26 @@ async function startServer() {
   });
 
   app.post("/api/submissions/:id/score", (req, res) => {
-    const { criteria1, criteria2, criteria3 } = req.body;
+    const { criteria1, criteria2, criteria3, criteria4, judgeId } = req.body;
     const submissionId = req.params.id;
-    const total = (parseFloat(criteria1) + parseFloat(criteria2) + parseFloat(criteria3)) / 3;
+    const total = (parseFloat(criteria1) + parseFloat(criteria2) + parseFloat(criteria3) + parseFloat(criteria4)) / 4;
 
     const insertScore = db.prepare(`
-      INSERT INTO scores (submission_id, criteria1, criteria2, criteria3, total)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO scores (submission_id, criteria1, criteria2, criteria3, criteria4, total)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(submission_id) DO UPDATE SET
+        criteria1 = excluded.criteria1,
+        criteria2 = excluded.criteria2,
+        criteria3 = excluded.criteria3,
+        criteria4 = excluded.criteria4,
+        total = excluded.total
     `);
 
-    const updateStatus = db.prepare("UPDATE submissions SET status = 'completed' WHERE id = ?");
+    const updateSubmission = db.prepare("UPDATE submissions SET status = 'completed', judge_id = ? WHERE id = ?");
 
     const transaction = db.transaction(() => {
-      insertScore.run(submissionId, criteria1, criteria2, criteria3, total.toFixed(2));
-      updateStatus.run(submissionId);
+      insertScore.run(submissionId, criteria1, criteria2, criteria3, criteria4, total.toFixed(2));
+      updateSubmission.run(judgeId, submissionId);
     });
 
     transaction();
@@ -240,9 +248,25 @@ async function startServer() {
     res.json({ success: true });
   });
 
+  app.get("/api/my-judgments/:judgeId", (req, res) => {
+    const { judgeId } = req.params;
+    const judgments = db.prepare(`
+      SELECT s.id, p.name as participant_name, p.code as participant_code, c.name as category_name,
+             sc.criteria1, sc.criteria2, sc.criteria3, sc.criteria4, sc.total,
+             (SELECT url FROM images WHERE submission_id = s.id LIMIT 1) as thumbnail_url
+      FROM submissions s
+      JOIN participants p ON s.participant_id = p.id
+      JOIN categories c ON s.category_id = c.id
+      JOIN scores sc ON s.id = sc.submission_id
+      WHERE s.judge_id = ?
+      ORDER BY s.id DESC
+    `).all(judgeId);
+    res.json(judgments);
+  });
+
   app.get("/api/results", (req, res) => {
     const results = db.prepare(`
-      SELECT s.id, p.name as participant_name, p.code, c.name as category, sc.total, sc.criteria1, sc.criteria2, sc.criteria3, 
+      SELECT s.id, p.name as participant_name, p.code, c.name as category, sc.total, sc.criteria1, sc.criteria2, sc.criteria3, sc.criteria4,
              j.name as judge_name, s.judge_id as judge_code
       FROM scores sc
       JOIN submissions s ON sc.submission_id = s.id
