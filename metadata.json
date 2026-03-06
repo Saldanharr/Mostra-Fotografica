@@ -1,0 +1,5 @@
+{
+  "name": "Photo Contest Judging System",
+  "description": "A secure and anonymous judging platform for photography contests with category-based submissions and real-time concurrency control.",
+  "requestFramePermissions": []
+}
