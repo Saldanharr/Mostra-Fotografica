@@ -5,7 +5,7 @@ import { Server } from "socket.io";
 import http from "http";
 import path from "path";
 
-const db = new Database("contest_v2.db");
+const db = new Database("contest_v3.db");
 
 // Initialize Database
 db.exec(`
@@ -62,16 +62,16 @@ if (categoryCount.count === 0) {
   ['Profissional', 'Preto e Branco', 'Cotidiano'].forEach(name => insertCategory.run(name));
 
   const insertJudge = db.prepare("INSERT INTO judges (name) VALUES (?)");
-  const judgesList = ['Jurado Silva', 'Jurado Santos', 'Jurado Oliveira', 'Jurado Costa', 'Jurado Pereira'];
+  const judgesList = ['Ana Beatriz', 'Carlos Eduardo', 'Mariana Silva', 'Ricardo Santos', 'Fernanda Oliveira'];
   judgesList.forEach(name => insertJudge.run(name));
 
   const insertParticipant = db.prepare("INSERT INTO participants (code) VALUES (?)");
-  const insertSubmission = db.prepare("INSERT INTO submissions (participant_id, category_id, status, assigned_judge_id) VALUES (?, ?, ?, ?)");
+  const insertSubmission = db.prepare("INSERT INTO submissions (participant_id, category_id, status, assigned_judge_id, judge_id) VALUES (?, ?, ?, ?, ?)");
   const insertImage = db.prepare("INSERT INTO images (submission_id, url) VALUES (?, ?)");
   const insertScore = db.prepare("INSERT INTO scores (submission_id, criteria1, criteria2, criteria3, total) VALUES (?, ?, ?, ?, ?)");
 
-  // Create 15 participants
-  for (let i = 1; i <= 15; i++) {
+  // Create 20 participants
+  for (let i = 1; i <= 20; i++) {
     const code = `PART-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     const p = insertParticipant.run(code);
     const pId = p.lastInsertRowid;
@@ -81,19 +81,23 @@ if (categoryCount.count === 0) {
     const cats = [1, 2, 3].sort(() => 0.5 - Math.random()).slice(0, numCats);
     
     cats.forEach(catId => {
-      // Randomly decide status: pending, assigned, or completed
       const rand = Math.random();
       let status = 'pending';
       let assignedJudgeId: number | null = null;
+      let judgeId: string | null = null;
       
-      if (rand > 0.7) {
-        status = 'completed';
-      } else if (rand > 0.4) {
-        status = 'assigned';
-        assignedJudgeId = Math.floor(Math.random() * 5) + 1;
+      if (rand > 0.4) { // 60% are either assigned or completed
+        if (rand > 0.7) { // 30% completed
+          status = 'completed';
+          assignedJudgeId = Math.floor(Math.random() * 5) + 1;
+          judgeId = `judge_mock_${assignedJudgeId}`;
+        } else { // 30% assigned
+          status = 'assigned';
+          assignedJudgeId = Math.floor(Math.random() * 5) + 1;
+        }
       }
 
-      const s = insertSubmission.run(pId, catId, status, assignedJudgeId);
+      const s = insertSubmission.run(pId, catId, status, assignedJudgeId, judgeId);
       const sId = s.lastInsertRowid;
       
       // 3 images per submission
@@ -103,9 +107,9 @@ if (categoryCount.count === 0) {
 
       // If completed, add scores
       if (status === 'completed') {
-        const c1 = (Math.random() * 5 + 5).toFixed(2);
-        const c2 = (Math.random() * 5 + 5).toFixed(2);
-        const c3 = (Math.random() * 5 + 5).toFixed(2);
+        const c1 = (Math.random() * 4 + 6).toFixed(2); // Higher scores for mock data
+        const c2 = (Math.random() * 4 + 6).toFixed(2);
+        const c3 = (Math.random() * 4 + 6).toFixed(2);
         const total = ((parseFloat(c1) + parseFloat(c2) + parseFloat(c3)) / 3).toFixed(2);
         insertScore.run(sId, c1, c2, c3, total);
       }
@@ -231,11 +235,13 @@ async function startServer() {
 
   app.get("/api/results", (req, res) => {
     const results = db.prepare(`
-      SELECT s.id, p.code, c.name as category, sc.total, sc.criteria1, sc.criteria2, sc.criteria3
+      SELECT s.id, p.code, c.name as category, sc.total, sc.criteria1, sc.criteria2, sc.criteria3, 
+             j.name as judge_name, s.judge_id as judge_code
       FROM scores sc
       JOIN submissions s ON sc.submission_id = s.id
       JOIN participants p ON s.participant_id = p.id
       JOIN categories c ON s.category_id = c.id
+      LEFT JOIN judges j ON s.assigned_judge_id = j.id
       ORDER BY c.name, sc.total DESC
     `).all();
     res.json(results);

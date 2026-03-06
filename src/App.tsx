@@ -51,6 +51,8 @@ interface Result {
   criteria1: number;
   criteria2: number;
   criteria3: number;
+  judge_name?: string;
+  judge_code?: string;
 }
 
 const JUDGE_ID = `judge_${Math.random().toString(36).substring(2, 9)}`;
@@ -64,6 +66,8 @@ export default function App() {
   const [judges, setJudges] = useState<Judge[]>([]);
   const [currentSubmission, setCurrentSubmission] = useState<Submission | null>(null);
   const [results, setResults] = useState<Result[]>([]);
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [scores, setScores] = useState({ criteria1: '', criteria2: '', criteria3: '' });
   const [socket, setSocket] = useState<Socket | null>(null);
   const [loading, setLoading] = useState(false);
@@ -194,19 +198,29 @@ export default function App() {
     }
   };
 
+  const filteredAndSortedResults = results
+    .filter(res => filterCategory === 'all' || res.category === filterCategory)
+    .sort((a, b) => {
+      if (sortOrder === 'desc') return b.total - a.total;
+      return a.total - b.total;
+    });
+
   return (
-    <div className="min-h-screen bg-[#F5F5F0] text-[#141414] font-sans">
+    <div className="min-h-screen bg-[#F8F9FA] text-[#141414] font-sans">
       {/* Header */}
-      <header className="bg-white border-b border-[#141414]/10 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+      <header className="bg-white border-b border-brand-blue/10 sticky top-0 z-50 backdrop-blur-xl bg-white/80">
+        <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
           <div 
-            className="flex items-center gap-2 cursor-pointer" 
+            className="flex items-center gap-3 cursor-pointer group" 
             onClick={() => setView('categories')}
           >
-            <div className="w-8 h-8 bg-[#141414] rounded-lg flex items-center justify-center">
-              <Camera className="text-white w-5 h-5" />
+            <div className="w-10 h-10 bg-gradient-to-tr from-brand-blue via-brand-green to-brand-orange rounded-xl flex items-center justify-center shadow-lg shadow-brand-blue/20 group-hover:scale-110 transition-transform">
+              <Camera className="text-white w-6 h-6" />
             </div>
-            <h1 className="text-lg font-bold tracking-tight uppercase">PhotoJudge</h1>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-brand-blue to-brand-green bg-clip-text text-transparent">CONCURSO FOTOGRÁFICO</h1>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-orange">Painel de Julgamento</p>
+            </div>
           </div>
           
           <nav className="flex items-center gap-6">
@@ -214,7 +228,7 @@ export default function App() {
               onClick={() => setView('categories')}
               className={cn(
                 "text-sm font-medium transition-colors",
-                view === 'categories' ? "text-[#141414]" : "text-[#141414]/50 hover:text-[#141414]"
+                view === 'categories' ? "text-brand-blue" : "text-[#141414]/50 hover:text-brand-blue"
               )}
             >
               Categorias
@@ -223,7 +237,7 @@ export default function App() {
               onClick={fetchResults}
               className={cn(
                 "text-sm font-medium transition-colors",
-                view === 'results' ? "text-[#141414]" : "text-[#141414]/50 hover:text-[#141414]"
+                view === 'results' ? "text-brand-blue" : "text-[#141414]/50 hover:text-brand-blue"
               )}
             >
               Resultados
@@ -235,13 +249,13 @@ export default function App() {
               }}
               className={cn(
                 "text-sm font-medium transition-colors",
-                view === 'admin' ? "text-[#141414]" : "text-[#141414]/50 hover:text-[#141414]"
+                view === 'admin' ? "text-brand-blue" : "text-[#141414]/50 hover:text-brand-blue"
               )}
             >
               Atribuição
             </button>
             <div className="h-4 w-[1px] bg-[#141414]/10" />
-            <div className="flex items-center gap-2 text-xs font-mono bg-[#141414]/5 px-3 py-1.5 rounded-full">
+            <div className="flex items-center gap-2 text-xs font-mono bg-brand-blue/5 text-brand-blue px-3 py-1.5 rounded-full border border-brand-blue/10">
               <User className="w-3 h-3" />
               <span>{JUDGE_ID}</span>
             </div>
@@ -272,20 +286,20 @@ export default function App() {
                   <button
                     key={cat.id}
                     onClick={() => handleSelectCategory(cat)}
-                    className="group relative bg-white p-8 rounded-2xl border border-[#141414]/10 hover:border-[#141414] transition-all text-left overflow-hidden"
+                    className="group relative bg-white p-8 rounded-3xl border border-brand-blue/10 hover:border-brand-blue transition-all text-left overflow-hidden shadow-sm hover:shadow-xl hover:shadow-brand-blue/5"
                   >
                     <div className="relative z-10">
-                      <div className="w-12 h-12 rounded-xl bg-[#141414]/5 flex items-center justify-center mb-6 group-hover:bg-[#141414] group-hover:text-white transition-colors">
-                        <ImageIcon className="w-6 h-6" />
+                      <div className="w-14 h-14 rounded-2xl bg-brand-blue/5 flex items-center justify-center mb-6 group-hover:bg-brand-blue group-hover:text-white transition-all">
+                        <ImageIcon className="w-7 h-7" />
                       </div>
-                      <h3 className="text-xl font-bold mb-2">{cat.name}</h3>
-                      <div className="flex items-center gap-2 text-sm text-[#141414]/50">
-                        <span>Ver inscrições pendentes</span>
-                        <ChevronRight className="w-4 h-4" />
+                      <h3 className="text-2xl font-bold mb-2">{cat.name}</h3>
+                      <div className="flex items-center gap-2 text-sm text-brand-blue font-bold uppercase tracking-widest">
+                        <span>Ver inscrições</span>
+                        <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                       </div>
                     </div>
-                    <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                      <Camera className="w-24 h-24" />
+                    <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
+                      <Camera className="w-32 h-32" />
                     </div>
                   </button>
                 ))}
@@ -305,54 +319,54 @@ export default function App() {
               <div className="flex items-center justify-between">
                 <button 
                   onClick={() => setView('categories')}
-                  className="flex items-center gap-2 text-sm font-medium text-[#141414]/50 hover:text-[#141414] transition-colors"
+                  className="flex items-center gap-2 text-sm font-bold text-brand-blue hover:text-brand-blue/70 transition-colors uppercase tracking-widest"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  Voltar para categorias
+                  Voltar
                 </button>
-                <div className="bg-[#141414] text-white px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest">
+                <div className="bg-gradient-to-r from-brand-blue to-brand-green text-white px-6 py-2 rounded-full text-xs font-bold uppercase tracking-[0.2em] shadow-lg shadow-brand-blue/20">
                   {selectedCategory.name}
                 </div>
               </div>
 
-              <div className="bg-white rounded-3xl border border-[#141414]/10 overflow-hidden">
-                <div className="p-8 border-b border-[#141414]/10">
-                  <h2 className="text-2xl font-bold">Inscrições Pendentes</h2>
-                  <p className="text-[#141414]/50 text-sm mt-1">
+              <div className="bg-white rounded-[2.5rem] border border-brand-blue/10 overflow-hidden shadow-sm">
+                <div className="p-10 border-b border-brand-blue/10 bg-brand-blue/[0.02]">
+                  <h2 className="text-3xl font-bold">Inscrições Pendentes</h2>
+                  <p className="text-brand-blue/50 text-sm mt-2 font-medium">
                     {submissions.length} inscrições aguardando julgamento nesta categoria.
                   </p>
                 </div>
 
                 {loading ? (
-                  <div className="p-20 flex flex-col items-center justify-center text-[#141414]/30">
-                    <div className="w-8 h-8 border-2 border-current border-t-transparent rounded-full animate-spin mb-4" />
-                    <p>Carregando inscrições...</p>
+                  <div className="p-20 flex flex-col items-center justify-center text-brand-blue/30">
+                    <div className="w-10 h-10 border-4 border-brand-blue/20 border-t-brand-blue rounded-full animate-spin mb-4" />
+                    <p className="font-bold uppercase tracking-widest text-[10px]">Carregando...</p>
                   </div>
                 ) : submissions.length > 0 ? (
-                  <div className="divide-y divide-[#141414]/5">
+                  <div className="divide-y divide-brand-blue/5">
                     {submissions.map((sub) => (
-                      <div key={sub.id} className="p-6 flex items-center justify-between hover:bg-[#141414]/[0.02] transition-colors">
-                        <div className="flex items-center gap-6">
-                          <div className="w-12 h-12 rounded-full bg-[#141414]/5 flex items-center justify-center font-mono text-sm font-bold">
+                      <div key={sub.id} className="p-8 flex items-center justify-between hover:bg-brand-blue/[0.01] transition-colors">
+                        <div className="flex items-center gap-8">
+                          <div className="w-14 h-14 rounded-2xl bg-brand-blue/5 text-brand-blue flex items-center justify-center font-mono text-lg font-bold border border-brand-blue/10">
                             #{sub.id}
                           </div>
                           <div>
-                            <div className="font-mono text-sm font-bold tracking-tighter text-[#141414]/40">
+                            <div className="font-mono text-sm font-bold tracking-tighter text-brand-blue">
                               CÓDIGO: {sub.participant_code}
                             </div>
-                            <div className="flex items-center gap-3 mt-1">
-                              <span className="flex items-center gap-1 text-xs text-[#141414]/60">
-                                <ImageIcon className="w-3 h-3" /> 3 Imagens
+                            <div className="flex items-center gap-4 mt-2">
+                              <span className="flex items-center gap-1.5 text-xs font-bold text-[#141414]/40 uppercase tracking-widest">
+                                <ImageIcon className="w-3.5 h-3.5" /> 3 Imagens
                               </span>
-                              <span className="flex items-center gap-1 text-xs text-amber-600 font-medium">
-                                <Clock className="w-3 h-3" /> Aguardando
+                              <span className="flex items-center gap-1.5 text-xs text-brand-orange font-bold uppercase tracking-widest">
+                                <Clock className="w-3.5 h-3.5" /> Aguardando
                               </span>
                             </div>
                           </div>
                         </div>
                         <button
                           onClick={() => handleStartJudging(sub)}
-                          className="bg-[#141414] text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-[#141414]/90 transition-colors flex items-center gap-2"
+                          className="bg-brand-blue text-white px-8 py-3.5 rounded-2xl text-sm font-bold hover:bg-brand-blue/90 transition-all shadow-lg shadow-brand-blue/20 flex items-center gap-2 hover:scale-105 active:scale-95"
                         >
                           Julgar Agora
                           <ChevronRight className="w-4 h-4" />
@@ -361,10 +375,12 @@ export default function App() {
                     ))}
                   </div>
                 ) : (
-                  <div className="p-20 flex flex-col items-center justify-center text-[#141414]/30">
-                    <CheckCircle2 className="w-12 h-12 mb-4" />
-                    <p className="text-lg font-medium">Tudo pronto!</p>
-                    <p className="text-sm">Não há mais inscrições pendentes nesta categoria.</p>
+                  <div className="p-24 flex flex-col items-center justify-center text-brand-blue/20">
+                    <div className="w-20 h-20 bg-brand-green/10 rounded-full flex items-center justify-center mb-6">
+                      <CheckCircle2 className="w-10 h-10 text-brand-green" />
+                    </div>
+                    <p className="text-2xl font-bold text-brand-blue">Tudo pronto!</p>
+                    <p className="text-sm font-medium mt-2">Não há mais inscrições pendentes nesta categoria.</p>
                   </div>
                 )}
               </div>
@@ -382,22 +398,22 @@ export default function App() {
             >
               {/* Images Column */}
               <div className="lg:col-span-2 space-y-6">
-                <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-[#141414]/10">
+                <div className="flex items-center justify-between bg-white p-6 rounded-3xl border border-brand-blue/10 shadow-sm">
                   <div className="flex items-center gap-4">
-                    <div className="bg-[#141414] text-white px-3 py-1 rounded-lg text-xs font-mono">
+                    <div className="bg-brand-blue text-white px-4 py-1.5 rounded-xl text-xs font-mono font-bold shadow-md shadow-brand-blue/20">
                       {currentSubmission.participant_code}
                     </div>
-                    <h2 className="font-bold">{currentSubmission.category_name}</h2>
+                    <h2 className="font-bold text-lg">{currentSubmission.category_name}</h2>
                   </div>
                   <button 
                     onClick={handleCancelJudging}
-                    className="text-xs font-bold text-red-500 hover:underline"
+                    className="text-xs font-bold text-brand-orange hover:text-brand-orange/70 transition-colors uppercase tracking-widest"
                   >
-                    CANCELAR JULGAMENTO
+                    Cancelar Julgamento
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 gap-6">
                   {currentSubmission.images?.map((img, idx) => (
                     <div 
                       key={img.id} 
@@ -405,20 +421,20 @@ export default function App() {
                         setSelectedImage(img.url);
                         setZoom(1);
                       }}
-                      className="group relative bg-white p-2 rounded-3xl border border-[#141414]/10 overflow-hidden cursor-zoom-in hover:border-[#141414] transition-all"
+                      className="group relative bg-white p-3 rounded-[2.5rem] border border-brand-blue/10 overflow-hidden cursor-zoom-in hover:border-brand-blue transition-all shadow-sm hover:shadow-2xl hover:shadow-brand-blue/10"
                     >
                       <img 
                         src={img.url} 
                         alt={`Photo ${idx + 1}`}
-                        className="w-full aspect-[4/3] object-cover rounded-2xl group-hover:scale-[1.02] transition-transform duration-500"
+                        className="w-full aspect-[4/3] object-cover rounded-[2rem] group-hover:scale-[1.02] transition-transform duration-700"
                         referrerPolicy="no-referrer"
                       />
-                      <div className="absolute top-6 left-6 bg-black/50 backdrop-blur-md text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">
+                      <div className="absolute top-8 left-8 bg-brand-blue/80 backdrop-blur-md text-white px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] shadow-lg">
                         Imagem {idx + 1}
                       </div>
-                      <div className="absolute inset-0 bg-[#141414]/0 group-hover:bg-[#141414]/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
-                        <div className="bg-white p-3 rounded-full shadow-xl">
-                          <Maximize2 className="w-5 h-5" />
+                      <div className="absolute inset-0 bg-brand-blue/0 group-hover:bg-brand-blue/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                        <div className="bg-white p-4 rounded-full shadow-2xl scale-90 group-hover:scale-100 transition-transform">
+                          <Maximize2 className="w-6 h-6 text-brand-blue" />
                         </div>
                       </div>
                     </div>
@@ -428,22 +444,24 @@ export default function App() {
 
               {/* Scoring Column */}
               <div className="space-y-6">
-                <div className="bg-white p-8 rounded-3xl border border-[#141414] shadow-2xl shadow-[#141414]/5 sticky top-24">
-                  <div className="flex items-center gap-3 mb-8">
-                    <Star className="w-6 h-6 text-amber-500 fill-amber-500" />
-                    <h3 className="text-xl font-bold">Critérios de Avaliação</h3>
+                <div className="bg-white p-10 rounded-[2.5rem] border border-brand-blue/10 shadow-2xl shadow-brand-blue/5 sticky top-24">
+                  <div className="flex items-center gap-4 mb-10">
+                    <div className="w-12 h-12 bg-brand-orange/10 rounded-2xl flex items-center justify-center">
+                      <Star className="w-6 h-6 text-brand-orange fill-brand-orange" />
+                    </div>
+                    <h3 className="text-2xl font-bold">Avaliação</h3>
                   </div>
 
-                  <form onSubmit={handleSubmitScores} className="space-y-8">
-                    <div className="space-y-6">
+                  <form onSubmit={handleSubmitScores} className="space-y-10">
+                    <div className="space-y-8">
                       {[
                         { id: 'criteria1', label: 'Composição e Técnica', desc: 'Uso de luz, enquadramento e foco.' },
                         { id: 'criteria2', label: 'Criatividade e Originalidade', desc: 'Perspectiva única e inovação.' },
                         { id: 'criteria3', label: 'Impacto e Narrativa', desc: 'Capacidade de contar uma história.' }
                       ].map((c) => (
                         <div key={c.id}>
-                          <label className="block text-sm font-bold mb-1">{c.label}</label>
-                          <p className="text-[10px] text-[#141414]/50 uppercase tracking-wider mb-3">{c.desc}</p>
+                          <label className="block text-sm font-bold mb-1.5 text-brand-blue">{c.label}</label>
+                          <p className="text-[10px] text-brand-blue/40 font-bold uppercase tracking-widest mb-4">{c.desc}</p>
                           <div className="relative">
                             <input
                               type="number"
@@ -454,9 +472,9 @@ export default function App() {
                               value={scores[c.id as keyof typeof scores]}
                               onChange={(e) => setScores(prev => ({ ...prev, [c.id]: e.target.value }))}
                               placeholder="1.00 - 10.00"
-                              className="w-full bg-[#141414]/5 border-2 border-transparent focus:border-[#141414] focus:bg-white rounded-xl px-4 py-3 outline-none transition-all font-mono font-bold"
+                              className="w-full bg-brand-blue/5 border-2 border-transparent focus:border-brand-blue focus:bg-white rounded-2xl px-5 py-4 outline-none transition-all font-mono font-bold text-lg text-brand-blue"
                             />
-                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-[#141414]/30">
+                            <div className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-brand-blue/30 tracking-widest">
                               PONTOS
                             </div>
                           </div>
@@ -464,13 +482,13 @@ export default function App() {
                       ))}
                     </div>
 
-                    <div className="pt-4">
-                      <div className="bg-[#141414]/5 p-4 rounded-2xl mb-6 border border-dashed border-[#141414]/20">
-                        <div className="flex items-center justify-between text-xs font-bold text-[#141414]/50 mb-1">
+                    <div className="pt-6">
+                      <div className="bg-brand-blue/5 p-6 rounded-2xl mb-8 border border-dashed border-brand-blue/20">
+                        <div className="flex items-center justify-between text-[10px] font-bold text-brand-blue/40 mb-2 tracking-[0.2em]">
                           <span>MÉDIA FINAL</span>
                           <span>AUTO-CALCULADO</span>
                         </div>
-                        <div className="text-3xl font-mono font-bold">
+                        <div className="text-4xl font-mono font-bold text-brand-blue">
                           {((parseFloat(scores.criteria1) || 0) + (parseFloat(scores.criteria2) || 0) + (parseFloat(scores.criteria3) || 0) > 0) 
                             ? (((parseFloat(scores.criteria1) || 0) + (parseFloat(scores.criteria2) || 0) + (parseFloat(scores.criteria3) || 0)) / 3).toFixed(2)
                             : "0.00"
@@ -480,19 +498,19 @@ export default function App() {
 
                       <button
                         type="submit"
-                        className="w-full bg-[#141414] text-white py-4 rounded-2xl font-bold hover:bg-[#141414]/90 transition-all flex items-center justify-center gap-2"
+                        className="w-full bg-brand-blue text-white py-5 rounded-2xl font-bold hover:bg-brand-blue/90 transition-all shadow-xl shadow-brand-blue/20 flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95"
                       >
                         Finalizar Avaliação
-                        <CheckCircle2 className="w-5 h-5" />
+                        <CheckCircle2 className="w-6 h-6" />
                       </button>
                     </div>
                   </form>
                 </div>
 
-                <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex gap-3">
-                  <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
-                  <p className="text-xs text-amber-800 leading-relaxed">
-                    <strong>Nota:</strong> Uma vez enviado, o julgamento não poderá ser alterado. Certifique-se de que as notas estão corretas.
+                <div className="bg-brand-orange/5 border border-brand-orange/20 p-6 rounded-3xl flex gap-4">
+                  <AlertCircle className="w-6 h-6 text-brand-orange shrink-0" />
+                  <p className="text-xs text-brand-orange/80 font-medium leading-relaxed">
+                    <strong>Atenção:</strong> Uma vez enviado, o julgamento não poderá ser alterado. Certifique-se de que as notas estão corretas.
                   </p>
                 </div>
               </div>
@@ -508,62 +526,93 @@ export default function App() {
               exit={{ opacity: 0, y: -20 }}
               className="space-y-8"
             >
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
                   <h2 className="text-4xl font-serif italic">Classificação Geral</h2>
                   <p className="text-[#141414]/50 mt-2">Resultados consolidados por categoria.</p>
                 </div>
-                <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center">
-                  <Trophy className="w-8 h-8 text-amber-600" />
+                
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-brand-blue/10">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-brand-blue/40">Categoria:</span>
+                    <select 
+                      value={filterCategory}
+                      onChange={(e) => setFilterCategory(e.target.value)}
+                      className="bg-transparent border-none text-sm font-bold outline-none cursor-pointer text-brand-blue"
+                    >
+                      <option value="all">Todas as Categorias</option>
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.name}>{cat.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button 
+                    onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+                    className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-brand-blue/10 hover:border-brand-blue transition-all"
+                  >
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-brand-blue/40">Ordem:</span>
+                    <span className="text-sm font-bold text-brand-blue">{sortOrder === 'desc' ? 'Maior Nota' : 'Menor Nota'}</span>
+                    <Trophy className={cn("w-4 h-4 text-brand-orange", sortOrder === 'asc' && "rotate-180")} />
+                  </button>
                 </div>
               </div>
 
-              <div className="bg-white rounded-3xl border border-[#141414]/10 overflow-hidden">
+              <div className="bg-white rounded-3xl border border-brand-blue/10 overflow-hidden shadow-xl shadow-brand-blue/5">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-[#141414]/5 border-b border-[#141414]/10">
-                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-[#141414]/50">Posição</th>
-                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-[#141414]/50">Código</th>
-                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-[#141414]/50">Categoria</th>
-                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-[#141414]/50">C1</th>
-                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-[#141414]/50">C2</th>
-                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-[#141414]/50">C3</th>
-                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-[#141414]/50">Média Final</th>
+                    <tr className="bg-brand-blue/5 border-b border-brand-blue/10">
+                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-brand-blue/50">Posição</th>
+                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-brand-blue/50">Código</th>
+                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-brand-blue/50">Categoria</th>
+                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-brand-blue/50">Julgador</th>
+                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-brand-blue/50">C1</th>
+                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-brand-blue/50">C2</th>
+                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-brand-blue/50">C3</th>
+                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-brand-blue/50">Média Final</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#141414]/5">
-                    {results.length > 0 ? results.map((res, idx) => (
-                      <tr key={res.id} className="hover:bg-[#141414]/[0.02] transition-colors">
+                  <tbody className="divide-y divide-brand-blue/5">
+                    {filteredAndSortedResults.length > 0 ? filteredAndSortedResults.map((res, idx) => (
+                      <tr key={res.id} className="hover:bg-brand-blue/[0.02] transition-colors">
                         <td className="p-6">
                           <div className={cn(
-                            "w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm",
-                            idx === 0 ? "bg-amber-100 text-amber-700" : 
-                            idx === 1 ? "bg-slate-100 text-slate-700" :
-                            idx === 2 ? "bg-orange-100 text-orange-700" : "bg-[#141414]/5 text-[#141414]/50"
+                            "w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shadow-sm",
+                            idx === 0 && filterCategory !== 'all' ? "bg-brand-orange text-white shadow-brand-orange/20" : 
+                            idx === 1 && filterCategory !== 'all' ? "bg-slate-400 text-white shadow-slate-400/20" :
+                            idx === 2 && filterCategory !== 'all' ? "bg-orange-400 text-white shadow-orange-400/20" : "bg-brand-blue/5 text-brand-blue/50"
                           )}>
                             {idx + 1}
                           </div>
                         </td>
-                        <td className="p-6 font-mono font-bold text-sm">{res.code}</td>
+                        <td className="p-6 font-mono font-bold text-sm text-[#141414]">{res.code}</td>
                         <td className="p-6">
-                          <span className="bg-[#141414]/5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                          <span className="bg-[#141414]/5 text-[#141414] px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-[#141414]/10">
                             {res.category}
                           </span>
                         </td>
-                        <td className="p-6 font-mono text-sm text-[#141414]/50">{res.criteria1.toFixed(2)}</td>
-                        <td className="p-6 font-mono text-sm text-[#141414]/50">{res.criteria2.toFixed(2)}</td>
-                        <td className="p-6 font-mono text-sm text-[#141414]/50">{res.criteria3.toFixed(2)}</td>
                         <td className="p-6">
-                          <div className="font-mono font-bold text-lg">{res.total.toFixed(2)}</div>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold text-[#141414]">{res.judge_name || 'Não Atribuído'}</span>
+                            <span className="text-[10px] font-mono text-[#141414]/30">{res.judge_code}</span>
+                          </div>
+                        </td>
+                        <td className="p-6 font-mono text-sm text-brand-blue font-bold">{res.criteria1.toFixed(2)}</td>
+                        <td className="p-6 font-mono text-sm text-brand-blue font-bold">{res.criteria2.toFixed(2)}</td>
+                        <td className="p-6 font-mono text-sm text-brand-blue font-bold">{res.criteria3.toFixed(2)}</td>
+                        <td className="p-6">
+                          <div className="font-mono font-bold text-xl text-brand-blue">{res.total.toFixed(2)}</div>
                         </td>
                       </tr>
                     )) : (
                       <tr>
-                        <td colSpan={7} className="p-20 text-center text-[#141414]/30">
+                        <td colSpan={8} className="p-24 text-center text-brand-blue/20">
                           <div className="flex flex-col items-center">
-                            <Clock className="w-12 h-12 mb-4" />
-                            <p className="text-lg font-medium">Nenhum resultado disponível</p>
-                            <p className="text-sm">Os resultados aparecerão aqui após o julgamento das inscrições.</p>
+                            <div className="w-16 h-16 bg-brand-blue/5 rounded-full flex items-center justify-center mb-6">
+                              <Clock className="w-8 h-8" />
+                            </div>
+                            <p className="text-xl font-bold text-brand-blue">Nenhum resultado disponível</p>
+                            <p className="text-sm font-medium mt-2">Os resultados aparecerão aqui após o julgamento das inscrições.</p>
                           </div>
                         </td>
                       </tr>
@@ -588,35 +637,35 @@ export default function App() {
                   <h2 className="text-4xl font-serif italic">Atribuição de Jurados</h2>
                   <p className="text-[#141414]/50 mt-2">Gerencie qual jurado é responsável por cada inscrição.</p>
                 </div>
-                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                  <Settings className="w-8 h-8 text-blue-600" />
+                <div className="w-16 h-16 bg-brand-blue/10 rounded-full flex items-center justify-center">
+                  <Settings className="w-8 h-8 text-brand-blue" />
                 </div>
               </div>
 
-              <div className="bg-white rounded-3xl border border-[#141414]/10 overflow-hidden">
+              <div className="bg-white rounded-3xl border border-brand-blue/10 overflow-hidden shadow-xl shadow-brand-blue/5">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-[#141414]/5 border-b border-[#141414]/10">
-                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-[#141414]/50">ID</th>
-                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-[#141414]/50">Candidato</th>
-                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-[#141414]/50">Categoria</th>
-                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-[#141414]/50">Status</th>
-                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-[#141414]/50">Jurado Atribuído</th>
-                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-[#141414]/50">Ação</th>
+                    <tr className="bg-brand-blue/5 border-b border-brand-blue/10">
+                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-brand-blue/50">ID</th>
+                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-brand-blue/50">Candidato</th>
+                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-brand-blue/50">Categoria</th>
+                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-brand-blue/50">Status</th>
+                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-brand-blue/50">Jurado Atribuído</th>
+                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-brand-blue/50">Ação</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#141414]/5">
+                  <tbody className="divide-y divide-brand-blue/5">
                     {adminSubmissions.map((sub) => (
-                      <tr key={sub.id} className="hover:bg-[#141414]/[0.02] transition-colors">
-                        <td className="p-6 font-mono text-sm">#{sub.id}</td>
-                        <td className="p-6 font-bold text-sm">{sub.participant_code}</td>
+                      <tr key={sub.id} className="hover:bg-brand-blue/[0.02] transition-colors">
+                        <td className="p-6 font-mono text-sm text-brand-blue/60">#{sub.id}</td>
+                        <td className="p-6 font-bold text-sm text-brand-blue">{sub.participant_code}</td>
                         <td className="p-6 text-sm">{sub.category_name}</td>
                         <td className="p-6">
                           <span className={cn(
-                            "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                            sub.status === 'completed' ? "bg-green-100 text-green-700" :
-                            sub.status === 'judging' ? "bg-blue-100 text-blue-700" :
-                            sub.status === 'assigned' ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-700"
+                            "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border",
+                            sub.status === 'completed' ? "bg-brand-green/10 text-brand-green border-brand-green/20" :
+                            sub.status === 'judging' ? "bg-brand-blue/10 text-brand-blue border-brand-blue/20" :
+                            sub.status === 'assigned' ? "bg-brand-orange/10 text-brand-orange border-brand-orange/20" : "bg-slate-100 text-slate-700 border-slate-200"
                           )}>
                             {sub.status === 'completed' ? 'Concluído' :
                              sub.status === 'judging' ? 'Em Julgamento' :
@@ -625,8 +674,8 @@ export default function App() {
                         </td>
                         <td className="p-6">
                           {sub.assigned_judge_name ? (
-                            <div className="flex items-center gap-2 text-sm font-medium">
-                              <User className="w-4 h-4 text-[#141414]/30" />
+                            <div className="flex items-center gap-2 text-sm font-medium text-brand-blue">
+                              <User className="w-4 h-4 text-brand-blue/30" />
                               {sub.assigned_judge_name}
                             </div>
                           ) : (
@@ -636,7 +685,7 @@ export default function App() {
                         <td className="p-6">
                           {sub.status !== 'completed' && sub.status !== 'judging' && (
                             <select 
-                              className="bg-[#141414]/5 border-none rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 ring-[#141414]/10"
+                              className="bg-brand-blue/5 border-brand-blue/10 border rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 ring-brand-blue/20 text-brand-blue"
                               onChange={(e) => handleAssignJudge(sub.id, parseInt(e.target.value))}
                               defaultValue=""
                             >
@@ -674,7 +723,7 @@ export default function App() {
                 <X className="w-6 h-6" />
               </motion.button>
 
-              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex items-center gap-4 bg-white/10 backdrop-blur-md p-2 rounded-2xl border border-white/10">
+              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex items-center gap-4 bg-brand-blue/20 backdrop-blur-md p-2 rounded-2xl border border-white/20">
                 <button 
                   onClick={() => setZoom(prev => Math.max(1, prev - 0.5))}
                   className="p-2 hover:bg-white/10 rounded-xl text-white transition-colors"
@@ -683,7 +732,7 @@ export default function App() {
                 </button>
                 <div className="w-24 h-1 bg-white/20 rounded-full overflow-hidden">
                   <div 
-                    className="h-full bg-white transition-all duration-300" 
+                    className="h-full bg-brand-green transition-all duration-300" 
                     style={{ width: `${((zoom - 1) / 4) * 100}%` }}
                   />
                 </div>
@@ -726,16 +775,18 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="max-w-7xl mx-auto px-4 py-12 border-t border-[#141414]/10 mt-12">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-2 opacity-30">
-            <Camera className="w-4 h-4" />
-            <span className="text-[10px] font-bold uppercase tracking-widest">Photo Contest Judging System v1.0</span>
+      <footer className="max-w-7xl mx-auto px-4 py-16 border-t border-brand-blue/10 mt-20">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+          <div className="flex items-center gap-3 opacity-40 grayscale hover:grayscale-0 transition-all cursor-default">
+            <div className="w-8 h-8 bg-brand-blue rounded-lg flex items-center justify-center">
+              <Camera className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-blue">Photo Contest Judging System v1.0</span>
           </div>
-          <div className="flex items-center gap-8 text-[10px] font-bold uppercase tracking-widest text-[#141414]/30">
-            <span>Privacidade</span>
-            <span>Termos</span>
-            <span>Suporte</span>
+          <div className="flex items-center gap-10 text-[10px] font-bold uppercase tracking-[0.2em] text-brand-blue/30">
+            <span className="hover:text-brand-blue transition-colors cursor-pointer">Privacidade</span>
+            <span className="hover:text-brand-blue transition-colors cursor-pointer">Termos</span>
+            <span className="hover:text-brand-blue transition-colors cursor-pointer">Suporte</span>
           </div>
         </div>
       </footer>
