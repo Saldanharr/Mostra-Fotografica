@@ -161,7 +161,13 @@ async function startServer() {
   });
 
   app.get("/api/categories", (req, res) => {
-    const categories = db.prepare("SELECT * FROM categories").all();
+    const categories = db.prepare(`
+      SELECT c.*, 
+        (SELECT COUNT(*) FROM submissions s WHERE s.category_id = c.id AND (s.status = 'pending' OR s.status = 'assigned')) as pending_count,
+        (SELECT COUNT(*) FROM submissions s WHERE s.category_id = c.id AND s.status = 'completed') as completed_count,
+        (SELECT COUNT(*) FROM submissions s WHERE s.category_id = c.id) as total_count
+      FROM categories c
+    `).all();
     res.json(categories);
   });
 

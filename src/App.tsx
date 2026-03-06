@@ -27,6 +27,9 @@ import * as XLSX from 'xlsx';
 interface Category {
   id: number;
   name: string;
+  pending_count: number;
+  completed_count: number;
+  total_count: number;
 }
 
 interface Submission {
@@ -118,6 +121,12 @@ export default function App() {
       newSocket.disconnect();
     };
   }, [selectedCategory]);
+
+  useEffect(() => {
+    if (view === 'categories') {
+      fetchCategories();
+    }
+  }, [view]);
 
   const fetchCategories = async () => {
     const res = await fetch('/api/categories');
@@ -357,35 +366,162 @@ export default function App() {
               exit={{ opacity: 0, y: -20 }}
               className="space-y-8"
             >
-              <div className="max-w-2xl">
-                <h2 className="text-4xl font-serif italic mb-4">Painel do Jurado</h2>
-                <p className="text-[#141414]/60 text-lg">
-                  Selecione uma categoria para iniciar o processo de julgamento anônimo.
-                </p>
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                <div className="max-w-2xl">
+                  <h2 className="text-5xl font-serif italic mb-4 bg-gradient-to-r from-brand-blue to-brand-green bg-clip-text text-transparent">
+                    Painel do Jurado
+                  </h2>
+                  <p className="text-[#141414]/60 text-lg leading-relaxed">
+                    Bem-vindo de volta. Aqui está o panorama geral do concurso e suas categorias de avaliação.
+                  </p>
+                </div>
+                
+                <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-brand-blue/5 shadow-sm">
+                  <div className="w-10 h-10 rounded-xl bg-brand-blue/10 flex items-center justify-center text-brand-blue">
+                    <Trophy className="w-5 h-5" />
+                  </div>
+                  <div className="pr-4">
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-brand-blue/40">Status Global</div>
+                    <div className="text-sm font-bold">
+                      {Math.round((categories.reduce((acc, cat) => acc + cat.completed_count, 0) / (categories.reduce((acc, cat) => acc + cat.total_count, 0) || 1)) * 100)}% Concluído
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {categories.map((cat) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => handleSelectCategory(cat)}
-                    className="group relative bg-white p-8 rounded-3xl border border-brand-blue/10 hover:border-brand-blue transition-all text-left overflow-hidden shadow-sm hover:shadow-xl hover:shadow-brand-blue/5"
+              {/* Stats Bento Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="md:col-span-2 bg-white p-8 rounded-[2.5rem] border border-brand-blue/5 shadow-sm flex items-center justify-between overflow-hidden relative group">
+                  <div className="relative z-10">
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-brand-blue/40 mb-2">Total de Inscrições</div>
+                    <div className="text-5xl font-bold tracking-tighter">{categories.reduce((acc, cat) => acc + cat.total_count, 0)}</div>
+                    <p className="text-xs text-brand-blue/60 mt-2 font-medium">Fotos enviadas para avaliação</p>
+                  </div>
+                  <div className="w-32 h-32 bg-brand-blue/5 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+                    <ImageIcon className="w-12 h-12 text-brand-blue/20" />
+                  </div>
+                  <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-brand-blue/5 rounded-full blur-2xl" />
+                </div>
+                
+                <div className="bg-brand-orange/5 p-8 rounded-[2.5rem] border border-brand-orange/10 shadow-sm flex flex-col justify-between">
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-brand-orange/60 mb-2">Aguardando</div>
+                  <div>
+                    <div className="text-4xl font-bold text-brand-orange">{categories.reduce((acc, cat) => acc + cat.pending_count, 0)}</div>
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-brand-orange/60 mt-1">
+                      <Clock className="w-3 h-3" /> PENDENTES
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-brand-green/5 p-8 rounded-[2.5rem] border border-brand-green/10 shadow-sm flex flex-col justify-between">
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-brand-green/60 mb-2">Concluídos</div>
+                  <div>
+                    <div className="text-4xl font-bold text-brand-green">{categories.reduce((acc, cat) => acc + cat.completed_count, 0)}</div>
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-brand-green/60 mt-1">
+                      <CheckCircle2 className="w-3 h-3" /> AVALIADOS
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {currentSubmission && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-gradient-to-r from-brand-orange/20 to-brand-orange/5 border border-brand-orange/20 p-8 rounded-[2.5rem] flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden"
+                >
+                  <div className="flex items-center gap-6 relative z-10">
+                    <div className="w-16 h-16 bg-brand-orange/20 rounded-2xl flex items-center justify-center text-brand-orange shadow-inner">
+                      <Clock className="w-8 h-8 animate-pulse" />
+                    </div>
+                    <div>
+                      <h4 className="text-xl font-bold text-brand-orange">Julgamento em Aberto</h4>
+                      <p className="text-brand-orange/70 font-medium">Você tem uma avaliação pausada. Deseja retomar agora?</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setView('judging')}
+                    className="w-full md:w-auto bg-brand-orange text-white px-10 py-4 rounded-2xl font-bold text-sm hover:bg-brand-orange/90 transition-all shadow-lg shadow-brand-orange/20 active:scale-95 relative z-10"
                   >
-                    <div className="relative z-10">
-                      <div className="w-14 h-14 rounded-2xl bg-brand-blue/5 flex items-center justify-center mb-6 group-hover:bg-brand-blue group-hover:text-white transition-all">
-                        <ImageIcon className="w-7 h-7" />
-                      </div>
-                      <h3 className="text-2xl font-bold mb-2">{cat.name}</h3>
-                      <div className="flex items-center gap-2 text-sm text-brand-blue font-bold uppercase tracking-widest">
-                        <span>Ver inscrições</span>
-                        <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                      </div>
-                    </div>
-                    <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
-                      <Camera className="w-32 h-32" />
-                    </div>
+                    Retomar Avaliação
                   </button>
-                ))}
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-brand-orange/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
+                </motion.div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                {categories.map((cat, idx) => {
+                  const progress = cat.total_count > 0 ? (cat.completed_count / cat.total_count) * 100 : 0;
+                  const isLarge = idx === 0; // Make the first one larger for Bento effect
+                  
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => handleSelectCategory(cat)}
+                      className={cn(
+                        "group relative bg-white p-10 rounded-[3rem] border border-brand-blue/5 hover:border-brand-blue/30 transition-all text-left overflow-hidden shadow-sm hover:shadow-2xl hover:shadow-brand-blue/10 flex flex-col justify-between min-h-[320px]",
+                        isLarge ? "md:col-span-7" : "md:col-span-5"
+                      )}
+                    >
+                      <div className="relative z-10 w-full">
+                        <div className="flex items-start justify-between mb-8">
+                          <div className="w-16 h-16 rounded-2xl bg-brand-blue/5 flex items-center justify-center group-hover:bg-brand-blue group-hover:text-white transition-all duration-500 shadow-sm">
+                            <ImageIcon className="w-8 h-8" />
+                          </div>
+                          <div className="text-right">
+                            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-blue/30 mb-1">Categoria</div>
+                            <div className={cn(
+                              "text-[10px] font-bold px-3 py-1 rounded-full inline-block uppercase tracking-widest",
+                              cat.pending_count === 0 ? "bg-brand-green/10 text-brand-green" : "bg-brand-blue/5 text-brand-blue"
+                            )}>
+                              {cat.pending_count === 0 ? 'Concluído' : `${cat.pending_count} Pendentes`}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <h3 className="text-3xl font-bold mb-2 group-hover:text-brand-blue transition-colors">{cat.name}</h3>
+                        <p className="text-brand-blue/40 text-sm font-medium mb-8">Clique para visualizar e avaliar as fotos desta categoria.</p>
+                      </div>
+
+                      <div className="relative z-10 w-full space-y-4">
+                        <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.2em] text-brand-blue/40">
+                          <span>Progresso da Categoria</span>
+                          <span className="text-brand-blue">{Math.round(progress)}%</span>
+                        </div>
+                        <div className="h-2 w-full bg-brand-blue/5 rounded-full overflow-hidden p-[2px]">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${progress}%` }}
+                            transition={{ duration: 1, ease: "easeOut" }}
+                            className="h-full bg-gradient-to-r from-brand-blue via-brand-green to-brand-blue bg-[length:200%_100%] animate-shimmer rounded-full"
+                          />
+                        </div>
+                        <div className="flex items-center justify-between mt-6">
+                          <div className="flex -space-x-2">
+                            {[1, 2, 3].map(i => (
+                              <div key={i} className="w-6 h-6 rounded-full border-2 border-white bg-brand-blue/10 flex items-center justify-center text-[8px] font-bold text-brand-blue/40">
+                                {i}
+                              </div>
+                            ))}
+                            <div className="w-6 h-6 rounded-full border-2 border-white bg-brand-blue/5 flex items-center justify-center text-[8px] font-bold text-brand-blue/40">
+                              +{cat.total_count}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-brand-blue font-bold uppercase tracking-widest group-hover:translate-x-1 transition-transform">
+                            <span>Avaliar</span>
+                            <ChevronRight className="w-4 h-4" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Decorative elements */}
+                      <div className="absolute top-0 right-0 p-8 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity duration-700 pointer-events-none">
+                        <Camera className="w-48 h-48 -rotate-12 translate-x-12 -translate-y-12" />
+                      </div>
+                      <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-brand-blue via-brand-green to-brand-orange opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  );
+                })}
               </div>
             </motion.div>
           )}
