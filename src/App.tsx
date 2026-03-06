@@ -16,10 +16,12 @@ import {
   X,
   ZoomIn,
   ZoomOut,
-  Maximize2
+  Maximize2,
+  Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
+import * as XLSX from 'xlsx';
 
 // Types
 interface Category {
@@ -45,6 +47,7 @@ interface Judge {
 
 interface Result {
   id: number;
+  participant_name: string;
   code: string;
   category: string;
   total: number;
@@ -134,6 +137,28 @@ export default function App() {
     const data = await res.json();
     setResults(data);
     setView('results');
+  };
+
+  const handleExportExcel = () => {
+    const exportData = filteredAndSortedResults.map((res, idx) => ({
+      'Classificação': idx + 1,
+      'Nome do Candidato': res.participant_name,
+      'Código do Candidato': res.code,
+      'Categoria': res.category,
+      'Julgador': res.judge_name || 'Não Atribuído',
+      'Nota C1': res.criteria1,
+      'Nota C2': res.criteria2,
+      'Nota C3': res.criteria3,
+      'Média Final': res.total
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Resultados");
+    
+    // Generate filename with current date
+    const date = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(workbook, `Resultados_Concurso_Foto_${date}.xlsx`);
   };
 
   const handleSelectCategory = (category: Category) => {
@@ -555,6 +580,14 @@ export default function App() {
                     <span className="text-sm font-bold text-brand-blue">{sortOrder === 'desc' ? 'Maior Nota' : 'Menor Nota'}</span>
                     <Trophy className={cn("w-4 h-4 text-brand-orange", sortOrder === 'asc' && "rotate-180")} />
                   </button>
+
+                  <button 
+                    onClick={handleExportExcel}
+                    className="flex items-center gap-2 bg-brand-green text-white px-6 py-2 rounded-xl hover:bg-brand-green/90 transition-all shadow-lg shadow-brand-green/20"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span className="text-sm font-bold">Exportar Excel</span>
+                  </button>
                 </div>
               </div>
 
@@ -563,7 +596,7 @@ export default function App() {
                   <thead>
                     <tr className="bg-brand-blue/5 border-b border-brand-blue/10">
                       <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-brand-blue/50">Posição</th>
-                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-brand-blue/50">Código</th>
+                      <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-brand-blue/50">Candidato</th>
                       <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-brand-blue/50">Categoria</th>
                       <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-brand-blue/50">Julgador</th>
                       <th className="p-6 text-[10px] font-bold uppercase tracking-widest text-brand-blue/50">C1</th>
@@ -585,7 +618,12 @@ export default function App() {
                             {idx + 1}
                           </div>
                         </td>
-                        <td className="p-6 font-mono font-bold text-sm text-[#141414]">{res.code}</td>
+                        <td className="p-6">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold text-[#141414]">{res.participant_name}</span>
+                            <span className="text-[10px] font-mono text-[#141414]/30">{res.code}</span>
+                          </div>
+                        </td>
                         <td className="p-6">
                           <span className="bg-[#141414]/5 text-[#141414] px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-[#141414]/10">
                             {res.category}

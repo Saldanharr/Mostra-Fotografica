@@ -5,12 +5,13 @@ import { Server } from "socket.io";
 import http from "http";
 import path from "path";
 
-const db = new Database("contest_v3.db");
+const db = new Database("contest_v4.db");
 
 // Initialize Database
 db.exec(`
   CREATE TABLE IF NOT EXISTS participants (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
     code TEXT UNIQUE NOT NULL
   );
 
@@ -65,15 +66,21 @@ if (categoryCount.count === 0) {
   const judgesList = ['Ana Beatriz', 'Carlos Eduardo', 'Mariana Silva', 'Ricardo Santos', 'Fernanda Oliveira'];
   judgesList.forEach(name => insertJudge.run(name));
 
-  const insertParticipant = db.prepare("INSERT INTO participants (code) VALUES (?)");
+  const insertParticipant = db.prepare("INSERT INTO participants (name, code) VALUES (?, ?)");
   const insertSubmission = db.prepare("INSERT INTO submissions (participant_id, category_id, status, assigned_judge_id, judge_id) VALUES (?, ?, ?, ?, ?)");
   const insertImage = db.prepare("INSERT INTO images (submission_id, url) VALUES (?, ?)");
   const insertScore = db.prepare("INSERT INTO scores (submission_id, criteria1, criteria2, criteria3, total) VALUES (?, ?, ?, ?, ?)");
 
   // Create 20 participants
+  const firstNames = ['João', 'Maria', 'Pedro', 'Ana', 'Lucas', 'Julia', 'Gabriel', 'Beatriz', 'Mateus', 'Lara'];
+  const lastNames = ['Silva', 'Santos', 'Oliveira', 'Souza', 'Rodrigues', 'Ferreira', 'Alves', 'Pereira', 'Lima', 'Gomes'];
+
   for (let i = 1; i <= 20; i++) {
+    const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+    const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+    const name = `${firstName} ${lastName}`;
     const code = `PART-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-    const p = insertParticipant.run(code);
+    const p = insertParticipant.run(name, code);
     const pId = p.lastInsertRowid;
 
     // Each participant in 1 to 3 random categories
@@ -235,7 +242,7 @@ async function startServer() {
 
   app.get("/api/results", (req, res) => {
     const results = db.prepare(`
-      SELECT s.id, p.code, c.name as category, sc.total, sc.criteria1, sc.criteria2, sc.criteria3, 
+      SELECT s.id, p.name as participant_name, p.code, c.name as category, sc.total, sc.criteria1, sc.criteria2, sc.criteria3, 
              j.name as judge_name, s.judge_id as judge_code
       FROM scores sc
       JOIN submissions s ON sc.submission_id = s.id
