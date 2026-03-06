@@ -4,8 +4,13 @@ import Database from "better-sqlite3";
 import { Server } from "socket.io";
 import http from "http";
 import path from "path";
+import { fileURLToPath } from "url";
 
-const db = new Database("contest_v5.db");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const dbPath = process.env.DATABASE_PATH || "contest_v5.db";
+const db = new Database(dbPath);
 
 // Initialize Database
 db.exec(`
