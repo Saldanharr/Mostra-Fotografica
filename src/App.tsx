@@ -17,7 +17,8 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize2,
-  Download
+  Download,
+  RotateCcw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
@@ -78,7 +79,8 @@ interface MyJudgment {
 const JUDGE_ID = `judge_${Math.random().toString(36).substring(2, 9)}`;
 
 export default function App() {
-  const [view, setView] = useState<'categories' | 'submissions' | 'judging' | 'results' | 'admin' | 'my-judgments'>('categories');
+  const [currentJudge, setCurrentJudge] = useState<Judge | null>(null);
+  const [view, setView] = useState<'categories' | 'submissions' | 'judging' | 'results' | 'admin' | 'my-judgments' | 'judge-select'>('judge-select');
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -117,6 +119,15 @@ export default function App() {
       }
     });
 
+    newSocket.on('database_reset', () => {
+      fetchCategories();
+      fetchJudges();
+      if (view === 'admin') fetchAdminSubmissions();
+      if (view === 'results') fetchResults();
+      if (view === 'my-judgments') fetchMyJudgments();
+      if (view === 'submissions' && selectedCategory) fetchSubmissions(selectedCategory.id);
+    });
+
     return () => {
       newSocket.disconnect();
     };
@@ -126,10 +137,11 @@ export default function App() {
     if (view === 'categories') {
       fetchCategories();
     }
-  }, [view]);
+  }, [view, currentJudge]);
 
   const fetchCategories = async () => {
-    const res = await fetch('/api/categories');
+    const url = currentJudge ? `/api/categories?judgeId=${currentJudge.id}` : '/api/categories';
+    const res = await fetch(url);
     const data = await res.json();
     setCategories(data);
   };
@@ -150,7 +162,10 @@ export default function App() {
 
   const fetchSubmissions = async (categoryId: number) => {
     setLoading(true);
-    const res = await fetch(`/api/submissions/pending/${categoryId}`);
+    const url = currentJudge 
+      ? `/api/submissions/pending/${categoryId}?judgeId=${currentJudge.id}`
+      : `/api/submissions/pending/${categoryId}`;
+    const res = await fetch(url);
     const data = await res.json();
     setSubmissions(data);
     setLoading(false);
@@ -164,8 +179,9 @@ export default function App() {
   };
 
   const fetchMyJudgments = async () => {
+    if (!currentJudge) return;
     setLoading(true);
-    const res = await fetch(`/api/my-judgments/${JUDGE_ID}`);
+    const res = await fetch(`/api/my-judgments/${currentJudge.id}`);
     const data = await res.json();
     setMyJudgments(data);
     setView('my-judgments');
@@ -213,11 +229,24 @@ export default function App() {
     }
   };
 
+  const handleResetDatabase = async () => {
+    if (confirm('Tem certeza que deseja resetar o banco de dados? Todos os dados atuais serão perdidos e novos dados fake serão criados.')) {
+      try {
+        const res = await fetch('/api/admin/reset', { method: 'POST' });
+        if (res.ok) {
+          alert('Banco de dados resetado com sucesso!');
+        }
+      } catch (error) {
+        alert('Erro ao resetar banco de dados');
+      }
+    }
+  };
+
   const handleStartJudging = async (submission: Submission) => {
     const res = await fetch(`/api/submissions/${submission.id}/lock`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ judgeId: JUDGE_ID })
+      body: JSON.stringify({ judgeId: currentJudge?.id || JUDGE_ID })
     });
 
     if (res.ok) {
@@ -252,7 +281,7 @@ export default function App() {
     const res = await fetch(`/api/submissions/${currentSubmission.id}/score`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...scores, judgeId: JUDGE_ID })
+      body: JSON.stringify({ ...scores, judgeId: currentJudge?.id || JUDGE_ID })
     });
 
     if (res.ok) {
@@ -307,15 +336,28 @@ export default function App() {
           </div>
           
           <nav className="flex items-center gap-6">
-            <button 
-              onClick={() => setView('categories')}
-              className={cn(
-                "text-sm font-medium transition-colors",
-                view === 'categories' ? "text-brand-blue" : "text-[#141414]/50 hover:text-brand-blue"
-              )}
-            >
-              Categorias
-            </button>
+            {currentJudge && (
+              <>
+                <button 
+                  onClick={() => setView('categories')}
+                  className={cn(
+                    "text-sm font-medium transition-colors",
+                    view === 'categories' ? "text-brand-blue" : "text-[#141414]/50 hover:text-brand-blue"
+                  )}
+                >
+                  Categorias
+                </button>
+                <button 
+                  onClick={fetchMyJudgments}
+                  className={cn(
+                    "text-sm font-medium transition-colors",
+                    view === 'my-judgments' ? "text-brand-blue" : "text-[#141414]/50 hover:text-brand-blue"
+                  )}
+                >
+                  Meus Julgamentos
+                </button>
+              </>
+            )}
             <button 
               onClick={fetchResults}
               className={cn(
@@ -337,26 +379,72 @@ export default function App() {
             >
               Atribuição
             </button>
-            <button 
-              onClick={fetchMyJudgments}
-              className={cn(
-                "text-sm font-medium transition-colors",
-                view === 'my-judgments' ? "text-brand-blue" : "text-[#141414]/50 hover:text-brand-blue"
-              )}
-            >
-              Meus Julgamentos
-            </button>
             <div className="h-4 w-[1px] bg-[#141414]/10" />
             <div className="flex items-center gap-2 text-xs font-mono bg-brand-blue/5 text-brand-blue px-3 py-1.5 rounded-full border border-brand-blue/10">
               <User className="w-3 h-3" />
-              <span>{JUDGE_ID}</span>
+              <span>{currentJudge?.name || 'Visitante'}</span>
             </div>
+            {currentJudge && (
+              <button 
+                onClick={() => {
+                  setCurrentJudge(null);
+                  setView('judge-select');
+                }}
+                className="text-xs font-bold text-red-500 hover:text-red-600 transition-colors uppercase tracking-widest"
+              >
+                Sair
+              </button>
+            )}
           </nav>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         <AnimatePresence mode="wait">
+          {/* Judge Selection View */}
+          {view === 'judge-select' && (
+            <motion.div
+              key="judge-select"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="max-w-md mx-auto mt-20"
+            >
+              <div className="bg-white rounded-[2.5rem] p-10 shadow-2xl shadow-brand-blue/10 border border-brand-blue/5 text-center">
+                <div className="w-20 h-20 bg-brand-blue/10 rounded-3xl flex items-center justify-center mx-auto mb-8">
+                  <User className="w-10 h-10 text-brand-blue" />
+                </div>
+                <h2 className="text-3xl font-serif italic mb-2">Acesso do Jurado</h2>
+                <p className="text-[#141414]/50 text-sm mb-10">Selecione sua identidade para começar a avaliar as inscrições atribuídas a você.</p>
+                
+                <div className="space-y-3">
+                  {judges.map(judge => (
+                    <button
+                      key={judge.id}
+                      onClick={() => {
+                        setCurrentJudge(judge);
+                        setView('categories');
+                      }}
+                      className="w-full flex items-center justify-between p-5 rounded-2xl border-2 border-brand-blue/5 hover:border-brand-blue hover:bg-brand-blue/5 transition-all group text-left"
+                    >
+                      <span className="font-bold text-brand-blue">{judge.name}</span>
+                      <ChevronRight className="w-5 h-5 text-brand-blue/30 group-hover:translate-x-1 transition-transform" />
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-10 pt-10 border-t border-brand-blue/5">
+                  <button 
+                    onClick={() => setView('results')}
+                    className="text-xs font-bold text-brand-blue/40 hover:text-brand-blue uppercase tracking-[0.2em] transition-colors"
+                  >
+                    Ver Resultados Públicos
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {/* Categories View */}
           {view === 'categories' && (
             <motion.div
@@ -450,44 +538,50 @@ export default function App() {
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                {categories.map((cat, idx) => {
-                  const progress = cat.total_count > 0 ? (cat.completed_count / cat.total_count) * 100 : 0;
-                  const isLarge = idx === 0; // Make the first one larger for Bento effect
-                  
-                  return (
-                    <button
-                      key={cat.id}
-                      onClick={() => handleSelectCategory(cat)}
-                      className={cn(
-                        "group relative bg-white p-10 rounded-[3rem] border border-brand-blue/5 hover:border-brand-blue/30 transition-all text-left overflow-hidden shadow-sm hover:shadow-2xl hover:shadow-brand-blue/10 flex flex-col justify-between min-h-[320px]",
-                        isLarge ? "md:col-span-7" : "md:col-span-5"
-                      )}
-                    >
-                      <div className="relative z-10 w-full">
-                        <div className="flex items-start justify-between mb-8">
-                          <div className="w-16 h-16 rounded-2xl bg-brand-blue/5 flex items-center justify-center group-hover:bg-brand-blue group-hover:text-white transition-all duration-500 shadow-sm">
-                            <ImageIcon className="w-8 h-8" />
-                          </div>
-                          <div className="text-right">
-                            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-blue/30 mb-1">Categoria</div>
-                            <div className={cn(
-                              "text-[10px] font-bold px-3 py-1 rounded-full inline-block uppercase tracking-widest",
-                              cat.pending_count === 0 ? "bg-brand-green/10 text-brand-green" : "bg-brand-blue/5 text-brand-blue"
-                            )}>
-                              {cat.pending_count === 0 ? 'Concluído' : `${cat.pending_count} Pendentes`}
+                {categories
+                  .filter(cat => !currentJudge || cat.total_count > 0)
+                  .map((cat, idx) => {
+                    const progress = cat.total_count > 0 ? (cat.completed_count / cat.total_count) * 100 : 0;
+                    const isLarge = idx === 0; // Make the first one larger for Bento effect
+                    
+                    return (
+                      <button
+                        key={cat.id}
+                        onClick={() => handleSelectCategory(cat)}
+                        className={cn(
+                          "group relative bg-white p-10 rounded-[3rem] border border-brand-blue/5 hover:border-brand-blue/30 transition-all text-left overflow-hidden shadow-sm hover:shadow-2xl hover:shadow-brand-blue/10 flex flex-col justify-between min-h-[320px]",
+                          isLarge ? "md:col-span-7" : "md:col-span-5"
+                        )}
+                      >
+                        <div className="relative z-10 w-full">
+                          <div className="flex items-start justify-between mb-8">
+                            <div className="w-16 h-16 rounded-2xl bg-brand-blue/5 flex items-center justify-center group-hover:bg-brand-blue group-hover:text-white transition-all duration-500 shadow-sm">
+                              <ImageIcon className="w-8 h-8" />
+                            </div>
+                            <div className="text-right">
+                              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-blue/30 mb-1">Status</div>
+                              <div className={cn(
+                                "text-[10px] font-bold px-3 py-1 rounded-full inline-block uppercase tracking-widest",
+                                cat.pending_count === 0 ? "bg-brand-green/10 text-brand-green" : "bg-brand-orange/10 text-brand-orange"
+                              )}>
+                                {cat.pending_count === 0 ? 'Concluído' : `${cat.pending_count} para avaliar`}
+                              </div>
                             </div>
                           </div>
+                          
+                          <h3 className="text-3xl font-bold mb-2 group-hover:text-brand-blue transition-colors">{cat.name}</h3>
+                          <p className="text-brand-blue/40 text-sm font-medium mb-8">
+                            {cat.pending_count > 0 
+                              ? `Você tem ${cat.pending_count} fotos aguardando sua avaliação nesta categoria.`
+                              : "Todas as fotos desta categoria já foram avaliadas por você."}
+                          </p>
                         </div>
-                        
-                        <h3 className="text-3xl font-bold mb-2 group-hover:text-brand-blue transition-colors">{cat.name}</h3>
-                        <p className="text-brand-blue/40 text-sm font-medium mb-8">Clique para visualizar e avaliar as fotos desta categoria.</p>
-                      </div>
 
-                      <div className="relative z-10 w-full space-y-4">
-                        <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.2em] text-brand-blue/40">
-                          <span>Progresso da Categoria</span>
-                          <span className="text-brand-blue">{Math.round(progress)}%</span>
-                        </div>
+                        <div className="relative z-10 w-full space-y-4">
+                          <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.2em] text-brand-blue/40">
+                            <span>Progresso: {cat.completed_count} de {cat.total_count}</span>
+                            <span className="text-brand-blue">{Math.round(progress)}%</span>
+                          </div>
                         <div className="h-2 w-full bg-brand-blue/5 rounded-full overflow-hidden p-[2px]">
                           <motion.div 
                             initial={{ width: 0 }}
@@ -977,8 +1071,17 @@ export default function App() {
                   <h2 className="text-4xl font-serif italic">Atribuição de Jurados</h2>
                   <p className="text-[#141414]/50 mt-2">Gerencie qual jurado é responsável por cada inscrição.</p>
                 </div>
-                <div className="w-16 h-16 bg-brand-blue/10 rounded-full flex items-center justify-center">
-                  <Settings className="w-8 h-8 text-brand-blue" />
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={handleResetDatabase}
+                    className="flex items-center gap-2 bg-red-50 text-red-600 px-6 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest hover:bg-red-100 transition-all border border-red-200"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Resetar Dados Fake
+                  </button>
+                  <div className="w-16 h-16 bg-brand-blue/10 rounded-full flex items-center justify-center">
+                    <Settings className="w-8 h-8 text-brand-blue" />
+                  </div>
                 </div>
               </div>
 

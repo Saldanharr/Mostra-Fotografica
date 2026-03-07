@@ -63,8 +63,7 @@ db.exec(`
 `);
 
 // Seed initial data if empty
-const categoryCount = db.prepare("SELECT COUNT(*) as count FROM categories").get() as { count: number };
-if (categoryCount.count === 0) {
+function seedData() {
   const insertCategory = db.prepare("INSERT INTO categories (name) VALUES (?)");
   ['Profissional', 'Preto e Branco', 'Cotidiano'].forEach(name => insertCategory.run(name));
 
@@ -131,6 +130,11 @@ if (categoryCount.count === 0) {
   }
 }
 
+const categoryCount = db.prepare("SELECT COUNT(*) as count FROM categories").get() as { count: number };
+if (categoryCount.count === 0) {
+  seedData();
+}
+
 async function startServer() {
   const app = express();
   const server = http.createServer(app);
@@ -143,6 +147,26 @@ async function startServer() {
   app.get("/api/judges", (req, res) => {
     const judges = db.prepare("SELECT * FROM judges").all();
     res.json(judges);
+  });
+
+  app.post("/api/admin/reset", (req, res) => {
+    try {
+      db.prepare("DELETE FROM scores").run();
+      db.prepare("DELETE FROM images").run();
+      db.prepare("DELETE FROM submissions").run();
+      db.prepare("DELETE FROM participants").run();
+      db.prepare("DELETE FROM judges").run();
+      db.prepare("DELETE FROM categories").run();
+      db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('scores', 'images', 'submissions', 'participants', 'judges', 'categories')").run();
+      
+      seedData();
+      
+      io.emit('database_reset');
+      res.json({ success: true });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Failed to reset database" });
+    }
   });
 
   app.get("/api/admin/submissions", (req, res) => {
@@ -166,13 +190,18 @@ async function startServer() {
   });
 
   app.get("/api/categories", (req, res) => {
-    const categories = db.prepare(`
+    const { judgeId } = req.query;
+    
+    let query = `
       SELECT c.*, 
-        (SELECT COUNT(*) FROM submissions s WHERE s.category_id = c.id AND (s.status = 'pending' OR s.status = 'assigned')) as pending_count,
-        (SELECT COUNT(*) FROM submissions s WHERE s.category_id = c.id AND s.status = 'completed') as completed_count,
-        (SELECT COUNT(*) FROM submissions s WHERE s.category_id = c.id) as total_count
+        (SELECT COUNT(*) FROM submissions s WHERE s.category_id = c.id AND (s.status = 'pending' OR s.status = 'assigned')${judgeId ? ' AND s.assigned_judge_id = ?' : ''}) as pending_count,
+        (SELECT COUNT(*) FROM submissions s WHERE s.category_id = c.id AND s.status = 'completed'${judgeId ? ' AND s.assigned_judge_id = ?' : ''}) as completed_count,
+        (SELECT COUNT(*) FROM submissions s WHERE s.category_id = c.id${judgeId ? ' AND s.assigned_judge_id = ?' : ''}) as total_count
       FROM categories c
-    `).all();
+    `;
+    
+    const params = judgeId ? [judgeId, judgeId, judgeId] : [];
+    const categories = db.prepare(query).all(...params);
     res.json(categories);
   });
 
@@ -187,7 +216,13 @@ async function startServer() {
       WHERE s.category_id = ? AND (s.status = 'pending' OR s.status = 'assigned')
     `;
     
-    const submissions = db.prepare(query).all(categoryId);
+    const params: any[] = [categoryId];
+    if (judgeId) {
+      query += ` AND s.assigned_judge_id = ?`;
+      params.push(judgeId);
+    }
+    
+    const submissions = db.prepare(query).all(...params);
     res.json(submissions);
   });
 
